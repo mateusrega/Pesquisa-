@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesquisa com Google Login</title>
+<style>
+  body { font-family: Arial; background: #f5f5f5; margin:0; padding:0; }
+  .container { max-width: 700px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1);}
+  h1 { text-align:center; color:#333; }
+  .hidden { display: none; }
+  .question { margin-bottom:20px; }
+  .question label { display:block; font-weight:bold; margin-bottom:5px; }
+  .question input[type="text"], .question textarea, .question select { width:100%; padding:10px; border-radius:5px; border:1px solid #ccc; font-size:14px; box-sizing:border-box; }
+  .options { display:flex; flex-direction:column; gap:5px; }
+  button { display:block; width:100%; padding:12px; background-color:#4CAF50; color:white; font-size:16px; border:none; border-radius:5px; cursor:pointer; margin-top:10px; }
+  button:hover { background-color:#45a049; }
+  table { width:100%; border-collapse: collapse; margin-top:20px; }
+  th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container" id="loginScreen">
+  <h1>Login</h1>
+  <button onclick="loginWithGoogle()">Entrar com Google</button>
+</div>
+
+<div class="container hidden" id="areaScreen">
+  <h1>Selecione sua área</h1>
+  <div class="question">
+    <select id="areaSelect">
+      <option value="">Selecione...</option>
+      <option value="estudante">Estudante</option>
+      <option value="pessoal">Pessoal</option>
+      <option value="criador">Criador de Conteúdo</option>
+      <option value="comercial">Comercial</option>
+      <option value="pequenaEmpresa">Pequena Empresa</option>
+      <option value="freelancer">Freelancer</option>
+    </select>
+  </div>
+  <button onclick="saveArea()">Próximo</button>
+</div>
+
+<div class="container hidden" id="formScreen">
+  <h1 id="formTitle">Formulário</h1>
+  <div id="formQuestions"></div>
+  <button onclick="submitForm()">Enviar Resposta</button>
+</div>
+
+<div class="container hidden" id="adminScreen">
+  <h1>Painel ADM</h1>
+  <canvas id="chart"></canvas>
+  <table id="responsesTable">
+    <thead><tr><th>Email</th><th>Área</th><th>Respostas</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+// ====== Configuração Firebase ======
+const firebaseConfig = {
+  apiKey: "SEU_API_KEY",
+  authDomain: "SEU_AUTH_DOMAIN",
+  projectId: "SEU_PROJECT_ID",
+  storageBucket: "SEU_STORAGE_BUCKET",
+  messagingSenderId: "SEU_MSG_ID",
+  appId: "SEU_APP_ID"
+};
+const adminUID = "SEU_UID_ADMIN";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ====== Formulários por área ======
+const formsByArea = {
+  estudante: [
+    { type: "text", label: "Qual curso você faz?" },
+    { type: "radio", label: "Você utiliza ferramentas online?", options:["Sim","Não"] }
+  ],
+  pessoal: [
+    { type: "text", label: "O que você busca melhorar pessoalmente?" },
+    { type: "checkbox", label: "Quais hábitos você segue?", options:["Leitura","Exercícios","Meditação"] }
+  ],
+  criador: [
+    { type: "text", label: "Qual tipo de conteúdo você produz?" },
+    { type: "radio", label: "Você monetiza seu conteúdo?", options:["Sim","Não"] }
+  ],
+  comercial: [
+    { type: "text", label: "Qual o tamanho da sua empresa?" },
+    { type: "checkbox", label: "Quais áreas deseja otimizar?", options:["Marketing","Vendas","TI"] }
+  ],
+  pequenaEmpresa: [
+    { type: "text", label: "Qual segmento da empresa?" },
+    { type: "radio", label: "Você utiliza automações?", options:["Sim","Não"] }
+  ],
+  freelancer: [
+    { type: "text", label: "Qual sua principal habilidade?" },
+    { type: "radio", label: "Você trabalha sozinho ou em equipe?", options:["Sozinho","Equipe"] }
+  ]
+};
+
+let currentUser = null;
+let userArea = "";
+
+// ====== Login com Google ======
+function loginWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider)
+    .then(result => afterLogin(result.user))
+    .catch(err => alert("Erro: "+err.message));
+}
+
+// ====== Pós-login ======
+function afterLogin(user){
+  currentUser = user;
+  if(user.uid === adminUID){
+    showAdmin();
+    return;
+  }
+  // Verifica se já selecionou área
+  db.collection("users").doc(user.uid).get()
+    .then(docSnap=>{
+      if(docSnap.exists && docSnap.data().area){
+        userArea = docSnap.data().area;
+        showFormScreen();
+      } else {
+        document.getElementById("loginScreen").classList.add("hidden");
+        document.getElementById("areaScreen").classList.remove("hidden");
+      }
+    });
+}
+
+// ====== Salvar área ======
+function saveArea(){
+  const area = document.getElementById("areaSelect").value;
+  if(!area){ alert("Selecione uma área"); return; }
+  userArea = area;
+  db.collection("users").doc(currentUser.uid).set({email: currentUser.email, area})
+    .then(()=>showFormScreen());
+}
+
+// ====== Mostrar formulário ======
+function showFormScreen(){
+  document.getElementById("areaScreen").classList.add("hidden");
+  document.getElementById("formScreen").classList.remove("hidden");
+  const questions = formsByArea[userArea];
+  const formDiv = document.getElementById("formQuestions");
+  formDiv.innerHTML = "";
+  questions.forEach((q,i)=>{
+    const div = document.createElement("div");
+    div.className="question";
+    let html = `<label>${q.label}</label>`;
+    if(q.type==="text") html += `<input type="text" id="q${i}">`;
+    else if(q.type==="textarea") html += `<textarea id="q${i}" rows="3"></textarea>`;
+    else if(q.type==="radio") html += q.options.map(o=>`<label><input type="radio" name="q${i}" value="${o}"> ${o}</label>`).join("");
+    else if(q.type==="checkbox") html += q.options.map(o=>`<label><input type="checkbox" name="q${i}" value="${o}"> ${o}</label>`).join("");
+    div.innerHTML = html;
+    formDiv.appendChild(div);
+  });
+  document.getElementById("formTitle").innerText = `Formulário - ${userArea.charAt(0).toUpperCase()+userArea.slice(1)}`;
+}
+
+// ====== Enviar respostas ======
+function submitForm(){
+  const questions = formsByArea[userArea];
+  const answers = {};
+  questions.forEach((q,i)=>{
+    if(q.type==="text" || q.type==="textarea") answers[q.label] = document.getElementById(`q${i}`).value;
+    else if(q.type==="radio"){
+      const checked = document.querySelector(`input[name="q${i}"]:checked`);
+      answers[q.label] = checked ? checked.value : "";
+    } else if(q.type==="checkbox"){
+      const checked = Array.from(document.querySelectorAll(`input[name="q${i}"]:checked`)).map(c=>c.value);
+      answers[q.label] = checked;
+    }
+  });
+  db.collection("responses").add({
+    userId: currentUser.uid,
+    email: currentUser.email,
+    area: userArea,
+    answers,
+    timestamp: new Date()
+  }).then(()=>alert("Resposta enviada!"));
+}
+
+// ====== Painel Admin ======
+function showAdmin(){
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("adminScreen").classList.remove("hidden");
+  db.collection("responses").onSnapshot(snapshot=>{
+    const data = [];
+    const tbody = document.querySelector("#responsesTable tbody");
+    tbody.innerHTML = "";
+    snapshot.forEach(doc=>{
+      const d = doc.data();
+      data.push(d);
+      const tr = document.createElement("tr");
+      tr.innerHTML=`<td>${d.email}</td><td>${d.area}</td><td>${JSON.stringify(d.answers)}</td>`;
+      tbody.appendChild(tr);
+    });
+    renderChart(data);
+  });
+}
+
+function renderChart(data){
+  const ctx = document.getElementById('chart').getContext('2d');
+  const areas = {};
+  data.forEach(d=> areas[d.area] = (areas[d.area]||0)+1);
+  const labels = Object.keys(areas);
+  const values = Object.values(areas);
+  if(window.myChart) window.myChart.destroy();
+  window.myChart = new Chart(ctx,{
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Respostas por área', data:values, backgroundColor:'rgba(75,192,192,0.6)' }] },
+    options:{ responsive:true, scales:{ y:{ beginAtZero:true } } }
+  });
+}
+</script>
+
+</body>
+  </html>
