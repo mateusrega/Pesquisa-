@@ -26,7 +26,8 @@ h1 {
 }
 
 /* Botões */
-button {
+button { 
+  text-alight: CENTER;
   background: #4a90e2;
   color: white;
   padding: 10px 20px;
