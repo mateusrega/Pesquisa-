@@ -1,13 +1,88 @@
-/* src/index.css */
-body {
+/* index.css */
+
+/* Reset simples */
+body, html {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: #f5f5f5;
+  padding: 0;
+  font-family: 'Arial', sans-serif;
+  background: #f0f4f8; /* fundo claro */
+  color: #333;
 }
 
-#root {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+/* Container centralizado */
+.container {
+  max-width: 600px;
+  margin: 50px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* Títulos */
+h1 {
+  text-align: center;
+  color: #4a90e2; /* azul */
+}
+
+/* Botões */
+button {
+  background: #4a90e2;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 15px;
+  transition: 0.2s;
+}
+
+button:hover {
+  background: #357ABD; /* azul mais escuro */
+}
+
+/* Inputs e selects */
+input, select, textarea {
+  width: 100%;
+  padding: 8px 10px;
+  margin: 5px 0 15px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+/* Labels */
+label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+}
+
+/* Table (admin) */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+table th, table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+table th {
+  background-color: #4a90e2;
+  color: white;
+}
+
+table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Chart */
+canvas#chart {
+  margin-top: 20px;
+  background: #f7f9fc;
+  border-radius: 12px;
+  padding: 10px;
 }
